@@ -1,0 +1,56 @@
+# PURPOSE: Prove feasible strict locality with Kueue Topology Aware Scheduling.
+# USED BY: `make lab3-required`; normally run after `make checkpoint-2`.
+# PRECONDITION: Both fake GPUs in at least one leaf are free and gpu-queue is Active.
+# CONTRACT:
+#   - The queue label delegates admission to Kueue.
+#   - The PodTemplate annotation requires the complete PodSet to fit in one leaf.
+# EXPECTED RESULT: Kueue admits two replicas, persists a topologyAssignment,
+# and kube-scheduler binds both Pods to Nodes carrying the same leaf label.
+# VERIFY WITH:
+#   kubectl get workloads -n training -o yaml
+#   kubectl get pods -n training -l job-name=training-topology-aware -o wide
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: training-topology-aware
+  namespace: training
+  labels:
+    # LocalQueue submission endpoint; without this label the Job bypasses Kueue.
+    kueue.x-k8s.io/queue-name: gpu-queue
+    workshop.example.com/lab: placement
+    workshop.example.com/distributed-training: "true"
+spec:
+  # Kueue treats the two replicas as one PodSet for quota/topology admission.
+  parallelism: 2
+  completions: 2
+  # Stable rank indexes make this shape resemble a distributed training Job.
+  completionMode: Indexed
+  template:
+    metadata:
+      labels:
+        workshop.example.com/lab: placement
+      annotations:
+        # Hard promise: wait unless every replica fits under one leaf value.
+        kueue.x-k8s.io/podset-required-topology: workshop.example.com/leaf
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 1
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: trainer
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        # Control-plane demonstration only; no CUDA/NCCL workload is executed.
+        args: ["pause"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          readOnlyRootFilesystem: true
+        resources:
+          requests:
+            workshop.example.com/gpu: 1
+          limits:
+            workshop.example.com/gpu: 1
+      restartPolicy: Never

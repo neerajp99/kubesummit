@@ -1,0 +1,69 @@
+# PURPOSE: Reject incomplete or conflicting topology intent at API submission.
+# USED BY: Optional `make admission-policy` demonstration for live slide 34.
+# SCOPE: Jobs explicitly marked distributed-training=true, and only when they
+# are submitted to a namespace carrying workshop.example.com/admission=enabled.
+# MUTATES WHEN APPLIED: One cluster-scoped ValidatingAdmissionPolicy and binding.
+# DOES NOT DO: Query DCIM, select a topology domain, reserve quota, or bind Pods.
+# DESIGN RULE: Static object-local policy belongs in CEL. External entitlement
+# or infrastructure lookups require a separately operated webhook/controller.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: topology-contract-for-distributed-training
+spec:
+  # Fail closed if this policy cannot evaluate an in-scope request.
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups: ["batch"]
+      apiVersions: ["v1"]
+      operations: ["CREATE", "UPDATE"]
+      resources: ["jobs"]
+  matchConditions:
+  # Ordinary Jobs in the selected namespace are ignored unless explicitly marked.
+  - name: distributed-training-only
+    expression: >-
+      has(object.metadata.labels) &&
+      'workshop.example.com/distributed-training' in object.metadata.labels &&
+      object.metadata.labels['workshop.example.com/distributed-training'] == 'true'
+  validations:
+  # Rule 1: distributed GPU Jobs must enter the Kueue admission path.
+  - expression: >-
+      has(object.metadata.labels) &&
+      'kueue.x-k8s.io/queue-name' in object.metadata.labels
+    message: "distributed training Jobs must declare kueue.x-k8s.io/queue-name"
+  # Rule 2: required and preferred are mutually exclusive service contracts.
+  - expression: >-
+      has(object.spec.template.metadata.annotations) &&
+      (
+        ('kueue.x-k8s.io/podset-required-topology' in object.spec.template.metadata.annotations) !=
+        ('kueue.x-k8s.io/podset-preferred-topology' in object.spec.template.metadata.annotations)
+      )
+    message: "declare exactly one of required or preferred PodSet topology"
+  # Rule 3: required locality may reference only organization-approved levels.
+  - expression: >-
+      !has(object.spec.template.metadata.annotations) ||
+      !('kueue.x-k8s.io/podset-required-topology' in object.spec.template.metadata.annotations) ||
+      object.spec.template.metadata.annotations['kueue.x-k8s.io/podset-required-topology'] in
+        ['workshop.example.com/leaf', 'workshop.example.com/block']
+    message: "required topology must be an approved leaf or block label"
+  # Rule 4: apply the same approved-level restriction to preferred locality.
+  - expression: >-
+      !has(object.spec.template.metadata.annotations) ||
+      !('kueue.x-k8s.io/podset-preferred-topology' in object.spec.template.metadata.annotations) ||
+      object.spec.template.metadata.annotations['kueue.x-k8s.io/podset-preferred-topology'] in
+        ['workshop.example.com/leaf', 'workshop.example.com/block']
+    message: "preferred topology must be an approved leaf or block label"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: topology-contract-for-distributed-training
+spec:
+  policyName: topology-contract-for-distributed-training
+  # Deny invalid requests. Audit/Warn are useful during a staged rollout.
+  validationActions: ["Deny"]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        workshop.example.com/admission: enabled

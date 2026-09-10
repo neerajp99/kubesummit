@@ -1,0 +1,29 @@
+# resource-flavor.yaml
+#
+# PURPOSE: Define the GPU capacity class and connect eligible Nodes to Topology.
+# USED BY: `make checkpoint-2` after label-gpu-nodes.sh marks the four workers.
+# RELATIONSHIP: ClusterQueue references this flavor; this flavor references
+# Topology/gpu-fabric; its nodeLabels select the Nodes that can supply it.
+#
+# Two real API constraints worth knowing before you apply this live:
+#   1. spec.nodeLabels must have at least one entry for a TAS flavor.
+#   2. Once topologyName is set, the ENTIRE spec becomes immutable — if you
+#      need to change the node selector later, delete and recreate this
+#      object rather than trying to kubectl edit it.
+#
+# Run cluster-setup/label-gpu-nodes.sh before applying this.
+apiVersion: kueue.x-k8s.io/v1beta2  # Kueue API group and installed CRD version.
+kind: ResourceFlavor                 # Describes one schedulable class of GPU capacity.
+metadata:
+  name: h100-topology                 # Referenced from ClusterQueue.resourceGroups.
+  labels:
+    # Organizational label only; this label is not copied to worker Nodes.
+    app.kubernetes.io/part-of: nvlink-topology-workshop
+spec:
+  # Eligibility selector—not physical topology. Keeping it separate lets a
+  # cluster carry topology labels on Nodes that do not offer this GPU class.
+  nodeLabels:
+    # Only Nodes marked as workshop GPU workers can provide this flavor.
+    workshop.example.com/gpu-node: "true"
+  # Attach selected Nodes to the ordered block/leaf/hostname hierarchy.
+  topologyName: gpu-fabric            # References metadata.name in topology.yaml.

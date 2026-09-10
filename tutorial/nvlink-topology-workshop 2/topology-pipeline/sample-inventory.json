@@ -1,0 +1,43 @@
+{
+  "$schema": "./inventory.schema.json",
+  "schemaVersion": "v1",
+  "generatedAt": "2026-09-02T00:00:00Z",
+  "nodes": [
+    {
+      "name": "topology-lab-worker",
+      "block": "block-1",
+      "leaf": "leaf-a",
+      "rack": "rack-a1",
+      "nic": "mlx5_0",
+      "gpuSku": "h100-sxm5",
+      "sources": {"rack": "netbox", "leaf": "lldp+fabric-api", "gpuSku": "gpu-operator", "numa": "kubelet"}
+    },
+    {
+      "name": "topology-lab-worker2",
+      "block": "block-1",
+      "leaf": "leaf-a",
+      "rack": "rack-a1",
+      "nic": "mlx5_0",
+      "gpuSku": "h100-sxm5",
+      "sources": {"rack": "netbox", "leaf": "lldp+fabric-api", "gpuSku": "gpu-operator", "numa": "kubelet"}
+    },
+    {
+      "name": "topology-lab-worker3",
+      "block": "block-1",
+      "leaf": "leaf-b",
+      "rack": "rack-b1",
+      "nic": "mlx5_0",
+      "gpuSku": "h100-sxm5",
+      "sources": {"rack": "netbox", "leaf": "lldp+fabric-api", "gpuSku": "gpu-operator", "numa": "kubelet"}
+    },
+    {
+      "name": "topology-lab-worker4",
+      "block": "block-1",
+      "leaf": "leaf-b",
+      "rack": "rack-b1",
+      "nic": "mlx5_0",
+      "gpuSku": "h100-sxm5",
+      "sources": {"rack": "netbox", "leaf": "lldp+fabric-api", "gpuSku": "gpu-operator", "numa": "kubelet"}
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+# PURPOSE: Give users in namespace `training` a local submission name.
+# USED BY: Jobs whose metadata label is kueue.x-k8s.io/queue-name=gpu-queue.
+# RELATIONSHIP: This namespaced object forwards admission to the cluster-scoped
+# ClusterQueue `gpu-training`; it contains no quota of its own.
+# EXPECTED STATUS: Active=True once the referenced ClusterQueue is Active and
+# its namespaceSelector admits this namespace.
+apiVersion: kueue.x-k8s.io/v1beta2  # Kueue API group and installed CRD version.
+kind: LocalQueue                     # Namespaced entry point used by submitted Jobs.
+metadata:
+  name: gpu-queue                     # Value used by the Job's queue-name label.
+  namespace: training                 # Only Jobs in this namespace can use it.
+  labels:
+    # Organizational label used to identify all workshop-owned objects.
+    app.kubernetes.io/part-of: nvlink-topology-workshop
+spec:
+  # ClusterQueue and LocalQueue deliberately have different names to make the
+  # namespace-to-cluster handoff visible in the workshop.
+  clusterQueue: gpu-training          # Delegate admission and quota to ClusterQueue.

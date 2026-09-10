@@ -1,0 +1,15 @@
+# PURPOSE: Create the namespace that owns every workshop Job, Pod and LocalQueue.
+# USED BY: `make checkpoint-1` via scripts/checkpoint.sh.
+# IDEMPOTENCY: `kubectl apply` safely creates or reconciles the same object.
+# POLICY BOUNDARY: The custom admission label is selected by
+# webhook/validating-admission-policy.yaml. This prevents the optional CEL
+# policy from changing admission behavior in unrelated namespaces.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: training
+  labels:
+    # Common ownership label used by the ClusterQueue namespaceSelector.
+    app.kubernetes.io/part-of: nvlink-topology-workshop
+    # Opt this namespace into the workshop's optional CEL validation policy.
+    workshop.example.com/admission: enabled

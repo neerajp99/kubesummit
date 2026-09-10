@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workshop.example.com/schemas/gpu-topology-inventory-v1.json",
+  "$comment": "Contract between infrastructure inventory owners and Kubernetes topology publication. Validate before mutating Node labels.",
+  "title": "GPU topology inventory contract",
+  "description": "Normalized, versioned topology facts with per-field provenance for every schedulable GPU node.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "generatedAt", "nodes"],
+  "properties": {
+    "$schema": {
+      "const": "./inventory.schema.json",
+      "description": "Connects this JSON document to its local machine-readable documentation and validation contract."
+    },
+    "schemaVersion": {
+      "const": "v1",
+      "description": "Version of this inventory contract, not the Kubernetes or hardware version."
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp when this normalized inventory snapshot was produced; operators use it to detect stale topology data."
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "description": "One normalized record for every Kubernetes worker that may participate in GPU scheduling.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "block", "leaf", "rack", "nic", "gpuSku", "sources"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Exact Kubernetes Node metadata.name to which the normalized topology facts will be published."
+          },
+          "block": {
+            "type": "string",
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+            "description": "Coarse fabric domain containing multiple leaf switches; this is the wider TAS fallback boundary in the lab."
+          },
+          "leaf": {
+            "type": "string",
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+            "description": "Leaf-switch domain to which the worker NIC is connected; same-leaf placement is the preferred fast network locality demonstrated in the lab."
+          },
+          "rack": {
+            "type": "string",
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+            "description": "Physical rack identifier, retained as an operational location fact even though the live TAS hierarchy uses block, leaf, and hostname."
+          },
+          "nic": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Node network-interface identifier, such as the ConnectX interface mlx5_0 used for high-speed fabric traffic."
+          },
+          "gpuSku": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Normalized accelerator model or capacity class. h100-sxm5 means an NVIDIA H100 SXM5-class GPU node; the laptop lab still uses fake capacity, not real hardware."
+          },
+          "sources": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Per-field provenance: the authoritative system or discovery mechanism that supplied each topology fact.",
+            "required": ["rack", "leaf", "gpuSku", "numa"],
+            "properties": {
+              "rack": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Authority for rack placement; the sample uses NetBox/DCIM."
+              },
+              "leaf": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Authority for switch adjacency; the sample combines LLDP discovery with the fabric-management API."
+              },
+              "gpuSku": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Authority for GPU model discovery; the sample uses NVIDIA GPU Operator data."
+              },
+              "numa": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Authority for node-local NUMA topology; the sample names kubelet/device discovery."
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

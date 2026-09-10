@@ -1,0 +1,22 @@
+# PURPOSE: Teach Kueue which Node-label keys form the fabric hierarchy.
+# USED BY: `make checkpoint-2` after label-topology.sh publishes those labels.
+# PRECONDITION: Eligible workers carry every listed label; missing levels make
+# a Node unusable for topology assignment at that level.
+# SCOPE: This object declares vocabulary/order. It does not contain node names,
+# discover switches, label Nodes, define quota, or bind Pods.
+# EXPECTED STATUS PATH: Workloads later record the selected domain beneath
+# status.admission.podSetAssignments[].topologyAssignment.
+apiVersion: kueue.x-k8s.io/v1beta2  # Kueue API group and installed CRD version.
+kind: Topology                       # Ordered hierarchy used by Topology-Aware Scheduling.
+metadata:
+  name: gpu-fabric                    # Referenced by ResourceFlavor.spec.topologyName.
+  labels:
+    # Organizational label used to identify the workshop's Kueue objects.
+    app.kubernetes.io/part-of: nvlink-topology-workshop
+spec:
+  # Ordered coarsest -> finest. TAS may widen toward a coarser parent only when
+  # the workload uses preferred topology; required topology does not widen.
+  levels:
+  - nodeLabel: workshop.example.com/block  # Coarsest domain: block-1 contains both leaves.
+  - nodeLabel: workshop.example.com/leaf   # Fabric domain: leaf-a or leaf-b.
+  - nodeLabel: kubernetes.io/hostname      # Finest domain: one Kubernetes Node.

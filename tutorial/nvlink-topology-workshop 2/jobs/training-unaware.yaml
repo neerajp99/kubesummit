@@ -1,0 +1,64 @@
+# PURPOSE: Demonstrate resource-correct but topology-unaware scheduling.
+# USED BY: `make lab1-demo`; removed by `make lab1-reset`.
+# PRECONDITION: placement-fillers.yaml occupies worker and worker3, leaving
+# exactly worker2 on leaf-a and worker4 on leaf-b with one fake GPU each.
+# IMPORTANT ABSENCES:
+#   - No kueue.x-k8s.io/queue-name: the Job bypasses Kueue admission.
+#   - No podset-required/preferred-topology annotation: the replicas express
+#     GPU quantity but no communication-locality relationship.
+# EXPECTED RESULT: Two trainer Pods become Ready, one on each leaf. The
+# placement is deterministic because the fillers leave only those two nodes.
+# INTERPRETATION: kube-scheduler satisfies every declared constraint; the
+# undesirable cross-leaf result comes from an incomplete workload contract.
+# DIRECT DEBUGGING:
+#   kubectl get pods -n training -l job-name=training-unaware -o wide
+#   kubectl get nodes -L workshop.example.com/leaf
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: training-unaware
+  namespace: training
+  labels:
+    workshop.example.com/lab: placement
+    workshop.example.com/distributed-training: "true"
+spec:
+  # Two peer replicas model two synchronous distributed-training ranks.
+  parallelism: 2
+  completions: 2
+  template:
+    metadata:
+      labels:
+        workshop.example.com/lab: placement
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 1
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: trainer
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        # Keep each rank alive for inspection; this performs no GPU computation.
+        args: ["pause"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          readOnlyRootFilesystem: true
+        resources:
+          # The fake extended resource exercises real scheduler accounting.
+          requests:
+            workshop.example.com/gpu: 1
+          limits:
+            workshop.example.com/gpu: 1
+      restartPolicy: Never
+
+
+# We don't create the trainer pods directly, but with the process:
+# We create Job/training-unaware
+#                  ↓
+# Kubernetes Job controller sees parallelism: 2
+#                  ↓
+# Job controller creates two trainer Pods
+#                  ↓
+# kube-scheduler places each Pod independently

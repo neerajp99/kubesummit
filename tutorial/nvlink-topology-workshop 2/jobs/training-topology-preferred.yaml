@@ -1,0 +1,56 @@
+# PURPOSE: Prove that *preferred* locality may widen to start an otherwise
+# infeasible Job; compare directly with training-impossible.yaml.
+# USED BY: `make lab3-preferred`, which resets earlier workshop workloads first.
+# PRECONDITION: Checkpoint 2 is healthy; each leaf has 2 GPUs and block-1 has 4.
+# CONTRACT: Prefer one leaf for three one-GPU replicas, but allow TAS to widen
+# to the enclosing block when no leaf can satisfy the complete PodSet.
+# EXPECTED RESULT: The Workload is admitted at the wider domain and the three
+# trainer Pods span leaf-a and leaf-b.
+# BUSINESS MEANING: This trades some locality for a shorter queue delay; it is
+# appropriate only when the workload owner permits that trade-off.
+# VERIFY WITH:
+#   kubectl get workloads -n training -o yaml
+#   kubectl get pods -n training -l job-name=training-preferred -o wide
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: training-preferred
+  namespace: training
+  labels:
+    # Submit through Kueue; this is not a direct-to-scheduler Job.
+    kueue.x-k8s.io/queue-name: gpu-queue
+    workshop.example.com/lab: placement
+    workshop.example.com/distributed-training: "true"
+spec:
+  # Deliberately one replica larger than any leaf's capacity.
+  parallelism: 3
+  completions: 3
+  completionMode: Indexed
+  template:
+    metadata:
+      labels:
+        workshop.example.com/lab: placement
+      annotations:
+        # Soft preference: try leaf, then widen through the declared hierarchy.
+        kueue.x-k8s.io/podset-preferred-topology: workshop.example.com/leaf
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 1
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: trainer
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        args: ["pause"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          readOnlyRootFilesystem: true
+        resources:
+          requests:
+            workshop.example.com/gpu: 1
+          limits:
+            workshop.example.com/gpu: 1
+      restartPolicy: Never

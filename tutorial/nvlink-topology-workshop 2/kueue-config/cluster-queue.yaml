@@ -1,0 +1,29 @@
+# PURPOSE: Define the cluster-scoped admission quota available to the workshop.
+# USED BY: `make checkpoint-2`; selected by training/LocalQueue `gpu-queue`.
+# CAPACITY CONTRACT: 4 fake GPUs under ResourceFlavor `h100-topology`.
+# IMPORTANT DISTINCTION: This answers whether quota may be reserved. The linked
+# ResourceFlavor/Topology constrain domains, and kube-scheduler still binds Pods.
+# EXPECTED STATUS: `Active=True` after every referenced resource exists.
+apiVersion: kueue.x-k8s.io/v1beta2  # Kueue API group and installed CRD version.
+kind: ClusterQueue                   # Cluster-wide quota and admission policy.
+metadata:
+  name: gpu-training                 # Referenced by LocalQueue.spec.clusterQueue.
+  labels:
+    # Organizational label used by this workshop; it does not affect scheduling.
+    app.kubernetes.io/part-of: nvlink-topology-workshop
+spec:
+  # Only namespaces carrying this ownership label may use the queue.
+  namespaceSelector:
+    matchLabels:
+      # The training namespace receives this label during cluster setup.
+      app.kubernetes.io/part-of: nvlink-topology-workshop
+  # A resource group accounts a set of resources through one or more flavors.
+  resourceGroups:
+  - coveredResources:
+    - workshop.example.com/gpu       # Fake extended resource requested by lab Pods.
+    flavors:
+    - name: h100-topology             # ResourceFlavor selecting topology-aware workers.
+      resources:
+      - name: workshop.example.com/gpu  # Quota entry for the covered fake GPU.
+        # Aggregate queue quota; topology may still make a smaller request infeasible.
+        nominalQuota: 4               # At most four fake GPUs admitted concurrently.

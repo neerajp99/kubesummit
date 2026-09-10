@@ -1,0 +1,3 @@
+placement,nodes,gpus,message_bytes,algorithm_bandwidth_gbps,bus_bandwidth_gbps,step_time_ms,tokens_per_second,mfu,source
+same_leaf,4,32,1073741824,,,,,,measured
+cross_leaf,4,32,1073741824,,,,,,measured

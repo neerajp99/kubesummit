@@ -1,0 +1,18 @@
+# PURPOSE: Define the five Docker-container nodes created by kind.
+# USED BY: `make checkpoint-1` -> scripts/checkpoint.sh -> `kind create cluster`.
+# CREATES: One Kubernetes control-plane node and four independent workers.
+# DOES NOT CREATE: GPUs, NVLink, InfiniBand, topology labels, or Kueue objects.
+# NEXT STEPS:
+#   - label-topology.sh publishes block/leaf/rack facts on the workers.
+#   - advertise-fake-gpus.sh publishes one simulated extended resource per worker.
+# WHY FOUR WORKERS: two workers per leaf lets the labs compare feasible
+# two-replica same-leaf placement with an impossible three-replica leaf request.
+apiVersion: kind.x-k8s.io/v1alpha4
+kind: Cluster
+name: topology-lab
+nodes:
+- role: control-plane  # Runs the API server, scheduler and controllers; no fake GPU.
+- role: worker         # Becomes topology-lab-worker  -> leaf-a / rack-a1 / GPU=1.
+- role: worker         # Becomes topology-lab-worker2 -> leaf-a / rack-a1 / GPU=1.
+- role: worker         # Becomes topology-lab-worker3 -> leaf-b / rack-b1 / GPU=1.
+- role: worker         # Becomes topology-lab-worker4 -> leaf-b / rack-b1 / GPU=1.

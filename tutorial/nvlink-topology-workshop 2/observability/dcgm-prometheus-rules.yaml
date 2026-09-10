@@ -1,0 +1,70 @@
+# dcgm-prometheus-rules.yaml
+#
+# REFERENCE — requires a real DCGM Exporter scraping real GPUs. There is no
+# GPU telemetry to collect against the fake resources in this lab, so this
+# file is for attendees to take home to an actual H100/A100 cluster, not to
+# apply against `topology-lab`.
+#
+# All field names below are verified against NVIDIA's DCGM field reference
+# (DCGM_FI_PROF_* family) rather than assumed. See the curriculum's
+# "Sources checked" section for what was cross-checked.
+#
+# Precision-matched peak TFLOPS used in the MFU estimate below are for
+# H100 SXM5: FP8 dense = 1979 TFLOPS (do NOT use the sparsity figure,
+# 3958 TFLOPS, for planning — real workloads rarely hit structured 2:4
+# sparsity). Swap in your own GPU's dense peak if you're not on H100.
+groups:
+- name: gpu-topology-workshop.mfu-estimate
+  rules:
+
+  # Achieved-vs-peak estimate, correlated from hardware activity — NOT a
+  # substitute for computing real MFU from measured training throughput.
+  # This is the "DCGM -> hardware activity" half of the two-part story;
+  # pair it with a real MFU metric your training framework emits.
+  - record: gpu_estimated_tensor_tflops
+    expr: DCGM_FI_PROF_PIPE_TENSOR_ACTIVE * 1979
+
+  # SM activity is the metric to alert/scale on — NOT DCGM_FI_DEV_GPU_UTIL,
+  # which saturates near 100% the moment any kernel ran in the sample
+  # window, regardless of how much of the GPU it used.
+  - record: gpu_sm_active_ratio
+    expr: DCGM_FI_PROF_SM_ACTIVE
+
+  - record: gpu_sm_occupancy_ratio
+    expr: DCGM_FI_PROF_SM_OCCUPANCY
+
+  - record: gpu_dram_active_ratio
+    expr: DCGM_FI_PROF_DRAM_ACTIVE
+
+  # NVLink should be doing the intra-node heavy lifting; PCIe traffic
+  # should stay comparatively low. If PCIe TX/RX rises while NVLink stays
+  # flat during a multi-GPU collective, that's a placement smell — a pair
+  # of GPUs that should be talking over NVLink are falling back to PCIe.
+  - record: gpu_nvlink_tx_bytes_per_sec
+    expr: rate(DCGM_FI_PROF_NVLINK_TX_BYTES[1m])
+  - record: gpu_nvlink_rx_bytes_per_sec
+    expr: rate(DCGM_FI_PROF_NVLINK_RX_BYTES[1m])
+  - record: gpu_pcie_tx_bytes_per_sec
+    expr: rate(DCGM_FI_PROF_PCIE_TX_BYTES[1m])
+  - record: gpu_pcie_rx_bytes_per_sec
+    expr: rate(DCGM_FI_PROF_PCIE_RX_BYTES[1m])
+
+- name: gpu-topology-workshop.alerts
+  rules:
+
+  # "Busy but not working" — the exact SM-utilization-can-lie failure mode
+  # from the talk. High SM activity, low tensor-pipe activity, sustained,
+  # usually means the GPU is warp-spinning on a communication barrier
+  # rather than doing math. This is the alert version of the "Run A vs
+  # Run B" table from the physics section.
+  - alert: GPUBusyButNotComputing
+    expr: gpu_sm_active_ratio > 0.85 and DCGM_FI_PROF_PIPE_TENSOR_ACTIVE < 0.3
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "GPU {{ $labels.gpu }} on {{ $labels.Hostname }} is SM-active but tensor-idle"
+      description: >-
+        SM active > 85% while tensor pipe active < 30% for 10 minutes.
+        Likely communication-bound, not compute-bound — check placement
+        (same-leaf vs. cross-leaf) before assuming the model is "just slow."

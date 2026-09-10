@@ -1,0 +1,4 @@
+placement,nodes,gpus,message_bytes,algorithm_bandwidth_gbps,bus_bandwidth_gbps,step_time_ms,tokens_per_second,mfu,source
+same_leaf,4,32,1073741824,,,1000,100000,0.91,analytical-example
+same_rack_cross_leaf,4,32,1073741824,,,1280,78000,0.71,analytical-example
+cross_rack,4,32,1073741824,,,1720,58000,0.53,analytical-example
