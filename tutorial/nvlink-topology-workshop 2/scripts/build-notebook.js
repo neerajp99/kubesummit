@@ -242,15 +242,15 @@ fi`, {
 });
 
 guidedBash(`make test`, {
-  title: "Validate the workshop repository",
-  mode: "REQUIRED BEFORE THE EVENT · OFFLINE · READ-ONLY",
-  objective: "Catch broken workshop assets without depending on Docker, a Kubernetes cluster, or conference networking.",
+  title: "Optional instructor check: validate the workshop repository",
+  mode: "OPTIONAL INSTRUCTOR PRE-EVENT CHECK · OFFLINE · READ-ONLY",
+  objective: "Let maintainers catch broken source assets before publishing; participants do not need this for the live labs.",
   invokes: ["`tests/static-test.sh`.", "Python `unittest` discovery for `tests/test_*.py`."],
-  actions: ["Runs `bash -n` on every shell entry point.", "Dry-runs important Make recipes.", "Parses every YAML document, validates the inventory against JSON Schema, validates both notebooks, and checks that their Bash cells parse.", "Tests the topology renderer, admission-policy core, and benchmark summarizer."],
+  actions: ["Runs `bash -n` on every shell entry point.", "Dry-runs important Make recipes.", "Parses every YAML document, validates the inventory against JSON Schema, validates the canonical notebook, and checks that its Bash cells parse.", "Tests the topology renderer, admission-policy core, and benchmark summarizer."],
   changes: "None. `make test` is not the end-to-end cluster test; that is the optional destructive `make smoke`.",
   success: "`Static validation passed...` followed by all Python tests reporting `OK`.",
   meaning: "The repository is internally coherent. It does not prove that Docker has enough internal disk or that a live kind cluster can start.",
-  recovery: "Read the first failing file/test in the output. Do not continue to the live labs until this target passes."
+  recovery: "Maintainers should fix the first reported source artifact. Participants may skip this optional check and use `make preflight`, `make prepare`, and the numbered checkpoints."
 });
 
 markdown(`### Recovery contract
@@ -1077,10 +1077,15 @@ const notebook = {
 };
 
 const serialized = `${JSON.stringify(notebook, null, 1)}\n`;
-for (const target of [
-  path.join(root, "workshop-walkthrough.ipynb"),
-  path.join(tutorialRoot, "workshop-walkthrough (1).ipynb"),
-]) {
+
+// A public clone is self-contained: its canonical notebook lives beside the
+// Makefile. Preserve synchronization with an older instructor-bundle copy only
+// when that file already exists; never create a file outside the workshop root.
+const notebookTargets = [path.join(root, "workshop-walkthrough.ipynb")];
+const legacyNotebook = path.join(tutorialRoot, "workshop-walkthrough (1).ipynb");
+if (fs.existsSync(legacyNotebook)) notebookTargets.push(legacyNotebook);
+
+for (const target of notebookTargets) {
   fs.writeFileSync(target, serialized);
   console.log(`wrote ${target}`);
 }

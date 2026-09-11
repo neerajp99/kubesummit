@@ -39,8 +39,14 @@ schema = json.loads((root / 'topology-pipeline/inventory.schema.json').read_text
 inventory = json.loads((root / 'topology-pipeline/sample-inventory.json').read_text())
 jsonschema.Draft202012Validator(schema).validate(inventory)
 
-notebook_paths = [root / 'workshop-walkthrough.ipynb', root.resolve().parent / 'workshop-walkthrough (1).ipynb']
-assert notebook_paths[0].read_bytes() == notebook_paths[1].read_bytes(), 'generated notebook copies differ'
+# The cloned workshop is self-contained and requires only the notebook beside
+# its Makefile. Older instructor bundles carried a second parent-level copy;
+# compare it when present, but never require that private layout from attendees.
+notebook_paths = [root / 'workshop-walkthrough.ipynb']
+legacy_notebook = root.resolve().parent / 'workshop-walkthrough (1).ipynb'
+if legacy_notebook.exists():
+    assert notebook_paths[0].read_bytes() == legacy_notebook.read_bytes(), 'generated notebook copies differ'
+    notebook_paths.append(legacy_notebook)
 
 for path in notebook_paths:
     notebook = nbformat.read(str(path), as_version=4)

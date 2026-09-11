@@ -35,7 +35,7 @@ help:
 	@echo "  make checkpoint-3       Recover the clean TAS-ready state"
 	@echo ""
 	@echo "Optional/reference:"
-	@echo "  make notebook           Regenerate both attendee notebook copies"
+	@echo "  make notebook           Regenerate the attendee notebook"
 	@echo "  make admission-policy   Install the scoped CEL policy"
 	@echo "  make test               Run static and unit tests (no cluster needed)"
 	@echo "  make smoke              Run the full lab against a working Docker daemon"
@@ -157,7 +157,7 @@ admission-policy:
 	kubectl apply -f webhook/validating-admission-policy.yaml
 
 .PHONY: notebook
-# Keep the repository and top-level attendee copies byte-for-byte identical.
+# Regenerate the canonical notebook inside this self-contained workshop folder.
 notebook:
 	node scripts/build-notebook.js
 
